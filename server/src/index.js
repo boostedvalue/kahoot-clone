@@ -9,7 +9,7 @@ import {
   createRoom, startGame, nextQuestion, submitAnswer,
   getLeaderboard, getPodium, endGame, addPlayer,
   removePlayer, getRoom, getAllAnswersCount, getPlayerCount,
-  AVATARS, CATEGORIES, TIME_LIMITS,
+  AVATARS, CATEGORIES,
 } from './gameManager.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,7 +64,8 @@ function advanceToNextQuestion(pin) {
     sendGameEnd(pin);
     return false;
   }
-  io.to(`room:${pin}`).emit('question:new', question);
+  const room = getRoom(pin);
+  io.to(`room:${pin}`).emit('question:new', { ...question, showOnPlayers: room?.showOnPlayers ?? true });
   startQuestionTimer(pin);
   return true;
 }
@@ -86,9 +87,9 @@ function revealAndHandleEnd(pin) {
 
       const nextDelay = setTimeout(() => {
         advanceToNextQuestion(pin);
-      }, 4000);
+      }, 5000);
       roomTimers.set(`${pin}:leaderboard`, nextDelay);
-    }, 2000);
+    }, 4000);
     roomTimers.set(`${pin}:leaderboard`, leaderboardDelay);
   }
 }
@@ -98,7 +99,7 @@ function startQuestionTimer(pin) {
   const room = getRoom(pin);
   if (!room) return;
 
-  const timeLimit = (TIME_LIMITS[room.difficulty] || 20) * 1000;
+  const timeLimit = (room.timeLimit || 20) * 1000;
 
   const timer = setTimeout(() => {
     revealAndHandleEnd(pin);
@@ -117,6 +118,8 @@ io.on('connection', (socket) => {
         difficulty: data.difficulty,
         questionCount: data.questionCount,
         advanceMode: data.advanceMode || 'manual',
+        timeLimit: data.timeLimit || 20,
+        showOnPlayers: data.showOnPlayers !== false,
       });
       socket.join(`room:${pin}`);
       socket.data.pin = pin;
@@ -164,12 +167,11 @@ io.on('connection', (socket) => {
     try {
       const pin = data.pin || socket.data.pin;
       const totalQuestions = await startGame(pin);
+      const room = getRoom(pin);
       const question = nextQuestion(pin);
 
-      // Incluir la pregunta en game:started para que el host la reciba via navigation state
-      io.to(`room:${pin}`).emit('game:started', { totalQuestions, question });
-      // question:new para los jugadores que ya estan escuchando
-      io.to(`room:${pin}`).emit('question:new', question);
+      io.to(`room:${pin}`).emit('game:started', { totalQuestions, question, showOnPlayers: room?.showOnPlayers ?? true });
+      io.to(`room:${pin}`).emit('question:new', { ...question, showOnPlayers: room?.showOnPlayers ?? true });
 
       startQuestionTimer(pin);
 
@@ -196,8 +198,8 @@ io.on('connection', (socket) => {
       setTimeout(() => {
         const leaderboard = getLeaderboard(pin);
         io.to(`room:${pin}`).emit('leaderboard:update', { leaderboard, showing: true });
-        setTimeout(() => advanceToNextQuestion(pin), 4000);
-      }, 2000);
+        setTimeout(() => advanceToNextQuestion(pin), 5000);
+      }, 4000);
     }
   });
 
@@ -216,7 +218,7 @@ io.on('connection', (socket) => {
         setTimeout(() => {
           const ok = advanceToNextQuestion(pin);
           if (callback) callback({ ok, finished: !ok });
-        }, 5000);
+        }, 6000);
       } else {
         if (callback) callback({ ok: true, finished: false, leaderboard });
       }

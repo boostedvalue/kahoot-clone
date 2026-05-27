@@ -15,31 +15,38 @@ export default function GamePlayer() {
   const [leaderboard, setLeaderboard] = useState(null);
   const [podium, setPodium] = useState(null);
   const [waiting, setWaiting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [showOnPlayers, setShowOnPlayers] = useState(true);
   const playerIdRef = useRef(localStorage.getItem('playerId'));
   const playerNickRef = useRef(localStorage.getItem('playerNick'));
+  const timerRef = useRef(null);
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
     socket.on('question:new', (q) => {
       setQuestion(q);
+      setShowOnPlayers(q.showOnPlayers !== false);
       setSelected(null);
       setResult(null);
       setShowResult(false);
       setCorrectIndex(null);
       setLeaderboard(null);
       setWaiting(false);
+      setTimeLeft(q.timeLimit);
     });
 
     socket.on('question:reveal', (data) => {
       setCorrectIndex(data.correctOptionIndex);
       setShowResult(true);
+      setTimeLeft(0);
     });
 
     socket.on('leaderboard:update', (data) => {
       setLeaderboard(data);
       setWaiting(true);
       setQuestion(null);
+      setTimeLeft(null);
     });
 
     socket.on('game:end', (data) => {
@@ -58,8 +65,28 @@ export default function GamePlayer() {
       socket.off('leaderboard:update');
       socket.off('game:end');
       socket.off('host:disconnected');
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [pin]);
+
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timeLeft]);
 
   const handleAnswer = (optionIndex) => {
     if (selected !== null || showResult) return;
@@ -150,47 +177,115 @@ export default function GamePlayer() {
 
   return (
     <div className="game-player">
-      <div className="question-info">
-        Pregunta {question.questionNumber} de {question.totalQuestions}
-      </div>
-      <div className="player-question">{question.question}</div>
-
-      <div className="player-options">
-        {question.options.map((opt, i) => {
-          let className = `player-option ${COLORS[i]}`;
-          if (selected !== null) className += ' disabled';
-          if (selected === i) className += ' selected';
-          if (showResult && opt.correct) className += ' correct';
-          if (showResult && selected === i && !opt.correct) className += ' wrong';
-          return (
-            <button
-              key={i}
-              className={className}
-              onClick={() => handleAnswer(i)}
-              disabled={selected !== null}
-            >
-              {opt.text}
-            </button>
-          );
-        })}
-      </div>
-
-      {result && showResult && (
-        <div className="player-result" style={{ marginTop: 20, textAlign: 'center' }}>
-          {result.isCorrect ? (
-            <div>
-              <div style={{ fontSize: 48 }}>✅</div>
-              <div className="player-score-display">+{result.points}</div>
-              <div style={{ color: '#6bcb77', fontWeight: 600 }}>¡Correcto!</div>
-            </div>
-          ) : (
-            <div>
-              <div style={{ fontSize: 48 }}>❌</div>
-              <div style={{ color: '#ff6b6b', fontWeight: 600 }}>Incorrecto</div>
-              <div className="player-score-display" style={{ fontSize: 24 }}>+0 pts</div>
+      {!showOnPlayers ? (
+        <div className="center-screen-mode">
+          <div className="timer-bar-container">
+            <div
+              className="timer-bar"
+              style={{
+                width: `${(timeLeft / (question.timeLimit || 20)) * 100}%`,
+                transition: 'width 1s linear',
+                backgroundColor: timeLeft <= 5 ? '#ff4444' : '#6bcb77',
+              }}
+            />
+          </div>
+          <div className="timer-text">{timeLeft}s</div>
+          <h2>🔵 Mira la pantalla central</h2>
+          <p className="player-waiting-text">Toca el color de tu respuesta</p>
+          <div className="player-options">
+            {question.options.map((opt, i) => {
+              let className = `player-option ${COLORS[i]}`;
+              if (selected !== null) className += ' disabled';
+              if (selected === i) className += ' selected';
+              if (showResult && i === correctIndex) className += ' correct';
+              if (showResult && selected === i && i !== correctIndex) className += ' wrong';
+              return (
+                <button
+                  key={i}
+                  className={className}
+                  onClick={() => handleAnswer(i)}
+                  disabled={selected !== null}
+                  style={{ minHeight: 60, fontSize: 24 }}
+                >
+                  {COLORS[i]}
+                </button>
+              );
+            })}
+          </div>
+          {result && showResult && (
+            <div className="player-result" style={{ marginTop: 20, textAlign: 'center' }}>
+              {result.isCorrect ? (
+                <div>
+                  <div style={{ fontSize: 48 }}>✅</div>
+                  <div className="player-score-display">+{result.points}</div>
+                  <div style={{ color: '#6bcb77', fontWeight: 600 }}>¡Correcto!</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 48 }}>❌</div>
+                  <div style={{ color: '#ff6b6b', fontWeight: 600 }}>Incorrecto</div>
+                  <div className="player-score-display" style={{ fontSize: 24 }}>+0 pts</div>
+                </div>
+              )}
             </div>
           )}
         </div>
+      ) : (
+        <>
+          <div className="timer-bar-container">
+            <div
+              className="timer-bar"
+              style={{
+                width: `${(timeLeft / (question.timeLimit || 20)) * 100}%`,
+                transition: 'width 1s linear',
+                backgroundColor: timeLeft <= 5 ? '#ff4444' : '#6bcb77',
+              }}
+            />
+          </div>
+          <div className="timer-text">{timeLeft}s</div>
+          <div className="question-info">
+            Pregunta {question.questionNumber} de {question.totalQuestions}
+          </div>
+          <div className="player-question">{question.question}</div>
+
+          <div className="player-options">
+            {question.options.map((opt, i) => {
+              let className = `player-option ${COLORS[i]}`;
+              if (selected !== null) className += ' disabled';
+              if (selected === i) className += ' selected';
+              if (showResult && i === correctIndex) className += ' correct';
+              if (showResult && selected === i && i !== correctIndex) className += ' wrong';
+              return (
+                <button
+                  key={i}
+                  className={className}
+                  onClick={() => handleAnswer(i)}
+                  disabled={selected !== null}
+                >
+                  {opt.text}
+                </button>
+              );
+            })}
+          </div>
+
+          {result && showResult && (
+            <div className="player-result" style={{ marginTop: 20, textAlign: 'center' }}>
+              {result.isCorrect ? (
+                <div>
+                  <div style={{ fontSize: 48 }}>✅</div>
+                  <div className="player-score-display">+{result.points}</div>
+                  <div style={{ color: '#6bcb77', fontWeight: 600 }}>¡Correcto!</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 48 }}>❌</div>
+                  <div style={{ color: '#ff6b6b', fontWeight: 600 }}>Incorrecto</div>
+                  <div className="player-score-display" style={{ fontSize: 24 }}>+0 pts</div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {selected !== null && !showResult && (

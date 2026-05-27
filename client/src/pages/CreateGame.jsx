@@ -10,6 +10,8 @@ export default function CreateGame() {
     difficulty: 'medio',
     questionCount: '5',
     advanceMode: 'manual',
+    timeLimit: '20',
+    showOnPlayers: true,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +33,8 @@ export default function CreateGame() {
       difficulty: form.difficulty,
       questionCount: parseInt(form.questionCount),
       advanceMode: form.advanceMode,
+      timeLimit: parseInt(form.timeLimit) || 20,
+      showOnPlayers: form.showOnPlayers,
     }, (response) => {
       setLoading(false);
       if (response.ok) {
@@ -98,6 +102,42 @@ export default function CreateGame() {
                     onChange={() => setForm({...form, advanceMode: 'auto'})}
                   />
                   Automático
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Tiempo por Pregunta (segundos)</label>
+              <input
+                type="number"
+                min="5"
+                max="120"
+                value={form.timeLimit}
+                onChange={e => setForm({...form, timeLimit: e.target.value})}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #444', background: '#2a1f4e', color: '#fff', fontSize: 16, width: '100%' }}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Mostrar preguntas en dispositivos de jugadores</label>
+              <div style={{ display: 'flex', gap: 20, marginTop: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 400, fontSize: 14 }}>
+                  <input
+                    type="radio"
+                    name="showOnPlayers"
+                    checked={form.showOnPlayers === true}
+                    onChange={() => setForm({...form, showOnPlayers: true})}
+                  />
+                  Sí, mostrar en cada jugador
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 400, fontSize: 14 }}>
+                  <input
+                    type="radio"
+                    name="showOnPlayers"
+                    checked={form.showOnPlayers === false}
+                    onChange={() => setForm({...form, showOnPlayers: false})}
+                  />
+                  Solo en pantalla central
                 </label>
               </div>
             </div>

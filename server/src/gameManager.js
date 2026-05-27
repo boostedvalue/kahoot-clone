@@ -52,6 +52,8 @@ export function createRoom(data) {
     difficulty: data.difficulty,
     questionCount: data.questionCount,
     advanceMode: data.advanceMode || 'manual',
+    timeLimit: data.timeLimit || 20,
+    showOnPlayers: data.showOnPlayers !== false,
     players: [],
     questions: [],
     currentQuestionIndex: -1,
@@ -89,7 +91,7 @@ export function getCurrentQuestion(pin) {
     ...room.questions[idx],
     questionNumber: idx + 1,
     totalQuestions: room.questions.length,
-    timeLimit: TIME_LIMITS[room.difficulty] || 20,
+    timeLimit: room.timeLimit || 20,
   };
 }
 

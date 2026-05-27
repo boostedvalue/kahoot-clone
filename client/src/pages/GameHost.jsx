@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import socket from '../socket.js';
 
@@ -19,6 +19,8 @@ export default function GameHost() {
   const [leaderboard, setLeaderboard] = useState(null);
   const [podium, setPodium] = useState(null);
   const [showContinue, setShowContinue] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -31,6 +33,7 @@ export default function GameHost() {
       setLeaderboard(null);
       setShowContinue(false);
       setAnswered(0);
+      setTimeLeft(q.timeLimit);
     });
 
     socket.on('answer:count', (data) => {
@@ -41,11 +44,13 @@ export default function GameHost() {
     socket.on('question:reveal', () => {
       setRevealed(true);
       setShowContinue(true);
+      setTimeLeft(0);
     });
 
     socket.on('leaderboard:update', (data) => {
       setLeaderboard(data);
       setShowContinue(false);
+      setTimeLeft(null);
     });
 
     socket.on('game:end', (data) => {
@@ -60,8 +65,28 @@ export default function GameHost() {
       socket.off('question:reveal');
       socket.off('leaderboard:update');
       socket.off('game:end');
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [pin]);
+
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || revealed) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timeLeft, revealed]);
 
   const revealAnswers = () => {
     socket.emit('host:reveal-answers', { pin });
@@ -136,6 +161,18 @@ export default function GameHost() {
 
   return (
     <div className="game-host">
+      <div className="timer-bar-container">
+        <div
+          className="timer-bar"
+          style={{
+            width: `${(timeLeft / (question.timeLimit || 20)) * 100}%`,
+            transition: 'width 1s linear',
+            backgroundColor: timeLeft <= 5 ? '#ff4444' : '#6bcb77',
+          }}
+        />
+      </div>
+      <div className="timer-text">{timeLeft}s</div>
+
       <div className="question-card">
         <h2>Pregunta {questionNumber} de {totalQuestions}</h2>
         <div className="meta">{question.category} · {question.difficulty}</div>
