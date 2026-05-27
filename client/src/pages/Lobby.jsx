@@ -20,9 +20,9 @@ export default function Lobby() {
       setPlayers(data.players);
     });
 
-    socket.on('game:started', () => {
+    socket.on('game:started', (data) => {
       setStarted(true);
-      navigate(`/game/${pin}`);
+      navigate(`/game/${pin}`, { state: { firstQuestion: data.question } });
     });
 
     return () => {
@@ -33,7 +33,13 @@ export default function Lobby() {
   }, [pin]);
 
   const startGame = () => {
-    socket.emit('host:start-game', { pin });
+    setStarted(true);
+    socket.emit('host:start-game', { pin }, (response) => {
+      if (!response.ok) {
+        setStarted(false);
+        alert('Error al iniciar el juego: ' + (response.error || 'Error desconocido'));
+      }
+    });
   };
 
   const joinUrl = `${window.location.origin}/join?pin=${pin}`;

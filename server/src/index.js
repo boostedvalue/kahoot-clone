@@ -166,14 +166,17 @@ io.on('connection', (socket) => {
       const totalQuestions = await startGame(pin);
       const question = nextQuestion(pin);
 
-      io.to(`room:${pin}`).emit('game:started', { totalQuestions });
+      // Incluir la pregunta en game:started para que el host la reciba via navigation state
+      io.to(`room:${pin}`).emit('game:started', { totalQuestions, question });
+      // question:new para los jugadores que ya estan escuchando
       io.to(`room:${pin}`).emit('question:new', question);
 
       startQuestionTimer(pin);
 
-      callback({ ok: true, totalQuestions, question });
+      if (typeof callback === 'function') callback({ ok: true, totalQuestions, question });
     } catch (err) {
-      callback({ ok: false, error: err.message });
+      console.error('Error starting game:', err);
+      if (typeof callback === 'function') callback({ ok: false, error: err.message });
     }
   });
 

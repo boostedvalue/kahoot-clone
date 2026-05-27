@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import socket from '../socket.js';
 
 const COLORS = ['red', 'blue', 'yellow', 'green'];
@@ -8,9 +8,11 @@ const COLOR_LABELS = ['Rojo', 'Azul', 'Amarillo', 'Verde'];
 export default function GameHost() {
   const { pin } = useParams();
   const navigate = useNavigate();
-  const [question, setQuestion] = useState(null);
-  const [questionNumber, setQuestionNumber] = useState(0);
-  const [totalQuestions, setTotalQuestions] = useState(0);
+  const location = useLocation();
+  const initQ = location.state?.firstQuestion || null;
+  const [question, setQuestion] = useState(initQ);
+  const [questionNumber, setQuestionNumber] = useState(initQ?.questionNumber || 0);
+  const [totalQuestions, setTotalQuestions] = useState(initQ?.totalQuestions || 0);
   const [revealed, setRevealed] = useState(false);
   const [answered, setAnswered] = useState(0);
   const [totalPlayers, setTotalPlayers] = useState(0);
